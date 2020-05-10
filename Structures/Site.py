@@ -15,7 +15,7 @@ class Site():
     timeout:int=0
     xml_node:Element=None
 
-def parse_sites_arg(sites, parent_node:Element=None, *, as_site_obj:bool=True, _manager=None):
+def parse_sites_arg(sites, parent_node:Element=None, *, as_site_obj:bool=True, _manager=None) -> OrderedList:
     if(isinstance(sites, OrderedList)): return sites
     elif(isinstance(sites, dict)): return OrderedList(sites, _manager=_manager)
 

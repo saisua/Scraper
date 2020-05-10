@@ -10,7 +10,8 @@ from selenium import webdriver
 def get_configuration(*,tabs_per_window:int, headless:bool=False,
                         load_images:bool=True, disable_downloads:bool=False,
                         disable_javascript:bool=False, autoload_videos:bool=False,
-                        proxys={},
+                        proxys={}, block_cookies:str=True, enable_drm:bool=True,
+                        enable_extensions:bool=True, extensions:list=[],
                         options=None, profile=None, capabilities=None):
     if(capabilities is None):
         # https://github.com/SeleniumHQ/selenium/wiki/DesiredCapabilities
@@ -32,8 +33,9 @@ def get_configuration(*,tabs_per_window:int, headless:bool=False,
         del profile.DEFAULT_PREFERENCES['frozen']["browser.safebrowsing.enabled"]
         del profile.DEFAULT_PREFERENCES['frozen']["browser.safebrowsing.malware.enabled"]
         
+        del profile.DEFAULT_PREFERENCES['frozen']["xpinstall.whitelist.required"]
+
         #print(profile.DEFAULT_PREFERENCES)
-        #del profile.DEFAULT_PREFERENCES['frozen']["browser.aboutConfig.showWarning"]
     except KeyError as err: print(f"Error on default preferences {err}")
     #http://kb.mozillazine.org/About:config_entries  #profile
     #http://kb.mozillazine.org/Categorhttps://stackoverflow.com/qhttps://stackoverflow.com/questions/20884089/dynamically-changing-proxy-in-firefox-with-selenium-webdriveruestions/20884089/dynamically-changing-proxy-in-firefox-with-selenium-webdrivery:Preferences
@@ -109,8 +111,6 @@ def get_configuration(*,tabs_per_window:int, headless:bool=False,
                 "TL","TG","TK","TO","TT","TN","TR","TM","TC","TV",
                 "UG","UA","AE","GB","US","UM","UY","UZ","VU","VE",
                 "VN","VG","VI","WF","EH","YE","ZM","ZW"]))
-    #profile.set_preference("browser.search.region",'')
-    profile.set_preference("browser.search.defaultenginename",'')
     profile.set_preference("browser.search.order.1",'')
     profile.set_preference("security.fileuri.strict_origin_policy",False)
     profile.set_preference("security.fileuri.origin_policy",0)
@@ -148,7 +148,7 @@ def get_configuration(*,tabs_per_window:int, headless:bool=False,
     profile.set_preference("browser.formfill.enable", False)
     profile.set_preference("browser.microsummary.updateGenerators", False)
     profile.set_preference("browser.search.update", False)
-    profile.set_preference("browser.urlbar.filter.javascript", False)
+    profile.set_preference("browser.urlbar.filter.javascript", True)
     profile.set_preference("dom.allow_scripts_to_close_windows", True)
     #profile.set_preference("dom.disable_window_status_change", False)  Not necessary
     #profile.set_preference("dom. event. contextmenu. enabled", True)
@@ -172,10 +172,44 @@ def get_configuration(*,tabs_per_window:int, headless:bool=False,
     profile.set_preference("browser.aboutConfig.showWarning", False)
     profile.set_preference("browser.safebrowsing.enabled", True)
     profile.set_preference("browser.safebrowsing.malware.enabled", True)
-    if(not disable_downloads):
+    profile.set_preference("browser.ctrlTab.recentlyUsedOrder", False)
+    profile.set_preference("browser.contentblocking.features.strict", "tp,tpPrivate,cookieBehavior4,cm,fp")
+    profile.set_preference("browser.contentblocking.category", "custom")
+    profile.set_preference("privacy.clearOnShutdown.cookies", True)
+    profile.set_preference("privacy.clearOnShutdown.downloads", True)
+    profile.set_preference("privacy.donottrackheader.enabled", True)
+    profile.set_preference("browser.safebrowsing.downloads.remote.block_dangerous", True)
+    profile.set_preference("browser.safebrowsing.downloads.remote.block_dangerous_host", True)
+    profile.set_preference("browser.safebrowsing.downloads.enabled", True)
+    profile.set_preference("browser.safebrowsing.malware.enabled", True)
+    profile.set_preference("browser.safebrowsing.passwords.enabled", True)
+    profile.set_preference("browser.safebrowsing.phishing.enabled", True)
+    profile.set_preference("browser.urlbar.placeholderName", "Selenium")
+    profile.set_preference("layout.spellcheckDefault", 0)
+    profile.set_preference("browser.search.geoSpecificDefaults", False)
+    profile.set_preference("services.sync.prefs.sync.browser.urlbar.suggest.bookmark", False)
+    profile.set_preference("services.sync.prefs.sync.browser.urlbar.suggest.history", False)
+    profile.set_preference("services.sync.prefs.sync.browser.urlbar.suggest.openpage", False)
+    profile.set_preference("services.sync.prefs.sync.browser.urlbar.suggest.searches", False)
+    profile.set_preference("services.sync.prefs.sync.browser.urlbar.maxRichResults", False)
+    profile.set_preference("browser.urlbar.suggest.bookmark", False) 
+    profile.set_preference("browser.urlbar.suggest.history", False) 
+    profile.set_preference("browser.urlbar.suggest.searches", False) 
+    profile.set_preference("browser.newtabpage.activity-stream.improvesearch.topSiteSearchShortcuts.searchEngines","duckduckgo")
+    profile.set_preference("accessibility.force_disabled", True)
+    
+    if(isinstance(block_cookies, str) and "all" in block_cookies.lower()):
+        profile.set_preference("network.cookie.cookieBehavior", 2)
+        print("Cookies are disabled. This may cause some websites to not work")
+    else:
+        print(int(block_cookies))
+        profile.set_preference("network.cookie.cookieBehavior", int(block_cookies))
+
+    if(disable_downloads):
         profile.set_preference("browser.download.folderList", 2)
         profile.set_preference("browser.download.panel.shown", False)
-        #profile.set_preference("browser.download.dir", None)
+        profile.set_preference("browser.download.useDownloadDir", False)
+        profile.set_preference("services.sync.prefs.sync.browser.download.useDownloadDir", False)
         profile.set_preference("browser.helperApps.neverAsk.saveToDisk", "application/*")
         profile.set_preference("browser.helperApps.neverAsk.openFile", "application/*")
         profile.set_preference("pdfjs.disabled", True)
@@ -195,6 +229,8 @@ def get_configuration(*,tabs_per_window:int, headless:bool=False,
         profile.set_preference("media.autoplay.default", 1)
         profile.set_preference("browser.preferences.defaultPerformanceSettings.enabled", False)
 
+    if(enable_drm):
+        profile.set_preference("media.eme.enabled", True)
 
 
     #Test
@@ -225,6 +261,12 @@ def get_configuration(*,tabs_per_window:int, headless:bool=False,
         capabilities["javascriptEnabled"] = False
 
     #breakpoint()
+    if(enable_extensions):
+        profile.add_extension(".//Extensions//duckduckgo-privacy-extension//extension.xpi")
+
+        for extension in extensions:
+            profile.add_extension(extension)
+
 
     http_proxy = proxys.get("httpProxy", None)
     ssl_proxy = proxys.get("sslProxy", None)

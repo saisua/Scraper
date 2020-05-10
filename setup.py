@@ -29,7 +29,7 @@ except ImportError as err:
             " PATH (environment variable)")
     exit(-1)
 
-from os import getcwd, path
+from os import getcwd, path, makedirs
 print("[+] Done (git import)\n")
 
 
@@ -45,6 +45,22 @@ else:
         remote.fetch()
     local_repository.git.reset("--hard")
     print("[+] Done (git fetch)\n")
+
+if(not path.exists(f"{getcwd()}//Extensions//duckduckgo-privacy-extension")):
+    print("Importing requests...")
+    from requests import get as GET
+    print("[+] Done (requests import)\n")
+
+    print("Downloading extension...")
+    response = GET("https://addons.mozilla.org/firefox/downloads/file/3560936/duckduckgo_privacy_essentials-2020.4.30-an+fx.xpi?src=dp-btn-primary")
+    if(not response.status_code == 200):
+        print("Error when downolading an extension")
+        exit(-1)
+
+    makedirs(f"{getcwd()}//Extensions//duckduckgo-privacy-extension//")
+    with open(f"{getcwd()}//Extensions//duckduckgo-privacy-extension//extension.xpi", "wb") as file:
+        file.write(response.content)
+    print("[+] Done (extension download)\n")
 
 if(not path.isfile(f"{getcwd()}//geckodriver")):
     print("Importing platform...")

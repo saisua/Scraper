@@ -7,3 +7,8 @@ tldextract
 screeninfo
 gitpython
 wget
+pyreshark
+pem
+mitmproxy
+click
+pillow

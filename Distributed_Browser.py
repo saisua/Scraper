@@ -18,7 +18,8 @@ except ImportError as err:
     raise err
 
 def main():
-    #raise Exception("Not working yet")
+    raise NotImplementedError("Not tackled security issues regarding of serializing shared data")
+
     browser = Browser(["google.com"])
     serv = RPC('1',ip=input("ip > ")or"localhost",port=12412,start_on_connect=False)
 
