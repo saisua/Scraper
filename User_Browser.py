@@ -2,8 +2,11 @@ print("Starting User_Browser imports...  ")
 from multiprocessing import Process, Manager
 from re import search
 from collections import defaultdict
+from ctypes import c_bool
+from time import sleep
 import sys
 import io
+import re
 
 import requests
 
@@ -17,29 +20,101 @@ from selenium.webdriver.remote import utils
 from selenium.webdriver.remote.remote_connection import RemoteConnection
 from urllib import parse
 from validator_collection.checkers import is_url as validate_url
+from argparse import ArgumentParser
 
 from Browser import Browser
 from Structures.Site import Site
 from Structures.Async_generator import AGenerator
+from Structures.Interceptor import Interceptor
 
 print("Done (User_Browser)")
 
+# https://www.cssscript.com/demo/device-browser-fingerprint-generator-imprint-js/#
+# https://panopticlick.eff.org
+# https://amiunique.org/
+
+# AudioContext fingerprint
+# Hash of WebGL fingerprint
+# Hash of canvas fingerprint
+
+from click import echo
+
+class Identitier(Interceptor):
+    def __init__(self, *args, **kwargs):
+        print("[+] Interceptor set as Identity cloak")
+        super().__init__(*args, **kwargs)
+
+    response_regex = re.compile(b"(<head|<body)")
+
+    def response(self, flow):
+        """
+            The full HTTP response has been read.
+        """
+        
+        #echo("response", file=self.stdout)
+        #echo(f"response {flow.response.headers.get('content-type','')}", file=self.stdout)
+        #echo(f"response {flow.server_conn.address} -> {flow.client_conn.address}", file=self.stdout)
+
+        #flow.intercept()
+
+        if(self.active.value):
+            if('text/html' in flow.response.headers.get("content-type")):
+
+                b = self.response_regex.search(flow.response.content)
+                if(b):
+                    index = flow.response.content.find(b"<", b.start()+5)
+
+                    #echo(index, file=self.stdout)
+                    
+                    flow.response.content = (flow.response.content[:index] +
+                                            self.identity_script +
+                                            flow.response.content[index:])
+
+                    #echo(flow.response.content, file=self.stdout)
+
+                    
+                    
+
+        #flow.resume()
+
 def main():
+    args = __create_parser()
+
+    if(args.ii):
+        args.verbose = False
+        args.headless = False
+        args.interceptor = True
+        args.interceptor_identity = True
+        args.interceptor_disabled = False
+
     browser = Controlled_Browser(
-            verbose=True,
-            headless=False
+            verbose=args.verbose,
+            headless=args.headless,
+            autoload_videos=args.autoload_videos
             )
 
     browser.open(
-            #enable_interceptor=True, 
-            interceptor_kwargs={"process_non_realtime":True}
+            enable_interceptor=args.interceptor, 
+            interceptor_kwargs={
+                "process_non_realtime":args.interceptor_passive,
+                "non_realtime_interface":args.interceptor_interface
+                },
+            interceptor_object=(Identitier(
+                process_non_realtime=args.interceptor_passive,
+                non_realtime_interface=args.interceptor_interface
+                ) if args.interceptor_identity else None)
             )
     
+    if(browser.interceptor):
+        browser.interceptor.active.value = not args.interceptor_disabled
+        print(f"[?] Browser interceptor starts {'disabled' if args.interceptor_disabled else 'enabled'}")
+
     browser.driver.switch_to.window("11")
-    for link in sys.argv[1:]:
+    for link in args.URLs:
         if(validate_url(link)):
             browser.open_link(link, new_tab=True)
         else:
+            print(f"[-] {link} is not recognized as a proper url. Searching for it instead.")
             browser.open_link(f"https://duckduckgo.com/?q={link}", new_tab=True)
     
     try:
@@ -53,9 +128,66 @@ def main():
     finally:            
         browser.close()
 
+def __create_parser():
+    ### Any functionality will be added as needed
+
+    description = """
+        Create new instances of Firefox, with custom controllers and security measures.
+        """
+
+    parser = ArgumentParser(description=description)
+    parser.add_argument(
+        "--headless",
+        action="store_true",
+        help="Launch this browser with no Graphical User Interface")
+    parser.add_argument(
+        "--verbose", "-v",
+        action="store_true",
+        help="Show data captured by the browser")
+    parser.add_argument(
+        "--autoload_videos",
+        action="store_true",
+        help="Auto-load the videos as soon as websites are loaded")
+    parser.add_argument(
+        "--interceptor", "-i",
+        action="store_true",
+        help="Start the interceptor tool, a proxy to capture browser's traffic")
+    parser.add_argument(
+        "--interceptor_disabled",
+        action="store_true",
+        help="If the interceptor should be disabled at start (can be enabled/disabled later too)")
+    parser.add_argument(
+        "--interceptor_passive",
+        action="store_true",
+        help="Wether to launch a pyshark (wireshark) instance")
+    parser.add_argument(
+        "--interceptor_interface",
+        action="store",
+        type=str,
+        default="any",
+        help="Interface where to capture browser's traffic")
+    parser.add_argument(
+        "--interceptor_identity",
+        action="store_true",
+        help="Dinamically change js-accessible tracking data")
+    parser.add_argument(
+        "-ii",
+        action="store_true",
+        help="Enable the interceptor and the identity cloaking")
+    parser.add_argument(
+        dest="URLs",
+        nargs='*',
+        type=str,
+        help="Websites to open after loading"
+    )
+
+    return parser.parse_args()
+
 
 class Controlled_Browser(Browser, AbstractEventListener):
     secondary_browser:Browser = None
+
+    active:bool
 
     _cmd_url:str
 
@@ -63,21 +195,33 @@ class Controlled_Browser(Browser, AbstractEventListener):
     keep_record:bool=False
 
     def __init__(self, *args, **kwargs):
+        if(not "manager" in kwargs):
+            kwargs["manager"] = Manager()
+
         self.__is_open = False
+        self.active = kwargs["manager"].Value(c_bool, True)
 
         self.verbose = kwargs.pop("verbose", False)
-        self.keep_record = kwargs.pop("keep_record", False)
+        #self.keep_record = kwargs.pop("keep_record", False)
 
         if(kwargs.pop("enable_secondary_browser", False)):
             self.secondary_browser = Browser(*args, **{**kwargs, "headless":True})
+
+        self.disable_event_listener = kwargs.pop("disable_event_listener", False)
 
         Browser.__init__(self, *args, **kwargs)
 
     def open(self, **kwargs):
         self.__is_open = True
 
-        Browser.open(self, **{**kwargs, "event_listener_obj":self
-                            ,"block_cookies":False
+        if(self.disable_event_listener or kwargs.pop("disable_event_listener", False)):
+            event_listener_obj = None
+        else:
+            event_listener_obj = self
+
+        Browser.open(self, **{**kwargs, "event_listener_obj":event_listener_obj
+                            ,"block_cookies":False, 
+                            "interceptor_object":kwargs.get("interceptor_object")
                             })
 
         if(not self.secondary_browser is None):
@@ -86,7 +230,7 @@ class Controlled_Browser(Browser, AbstractEventListener):
                             })
 
         self._cmd_url = self.driver.command_executor._url
-        print(f"Browser is in {self._cmd_url}/session/{self.driver.session_id}")
+        #print(f"Browser is in {self._cmd_url}/session/{self.driver.session_id}")
 
     def close(self):
         print(f"Shutting down the browser...")
@@ -104,6 +248,7 @@ class Controlled_Browser(Browser, AbstractEventListener):
         
         while(self.__is_open):
             try:
+                # Control and update browser's state
                 if(len(self.driver.window_handles) > self.num_tabs):
                     self.num_tabs = len(self.driver.window_handles)
                     if(self.verbose): print(self.driver.window_handles)
@@ -205,15 +350,21 @@ class Controlled_Browser(Browser, AbstractEventListener):
         if(self.verbose): print("(Driver) after_navigate_to ", url)
 
     def after_navigated_to(self, url, driver):
-        if(self.verbose): print("Got ", url)
+        if(self.verbose): 
+            print("Got ", url)
 
         self.driver.delete_all_cookies()
         #self.driver.execute(Command.CLEAR_APP_CACHE)
         #self.driver.execute(Command.CLEAR_LOCAL_STORAGE)
         #self.driver.execute(Command.CLEAR_SESSION_STORAGE)
 
+        if(not self.interceptor is None):
+            self.interceptor.new_identity()
+            print("Generated new interceptor identity")
+
     def after_close_tab(self, tab):
-        if(self.verbose): print(f"Closed tab  {tab} ({self._site_from_tab[tab].link})")
+        if(self.verbose): 
+            print(f"Closed tab  {tab} ({self._site_from_tab[tab].link})")
 
     def before_navigate_back(self, driver):
         if(self.verbose): print("(Driver) before_navigate_back ", driver.current_url)
