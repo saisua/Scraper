@@ -7,8 +7,11 @@ tldextract
 screeninfo
 gitpython
 wget
-pyreshark
+pyshark
 pem
 mitmproxy
 click
 pillow
+spacy
+neuralcoref
+python-owasp-zap-v2.4

@@ -1,5 +1,6 @@
 print("Starting Browser imports...  ")
 
+import socket
 from os import chdir, getcwd
 from collections.abc import Iterable
 from collections import defaultdict
@@ -10,17 +11,18 @@ from datetime import datetime, timedelta
 from typing import Tuple, Any, Union, Iterable, List, Optional, Dict
 from re import search as re_search
 from asyncio import run, create_task, get_event_loop, sleep as asleep
-
 from multiprocessing import Process, Manager, Lock
 from multiprocessing.managers import BaseProxy
 from selenium import webdriver
+
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.common.by import By
+from selenium.webdriver.remote.command import Command
+from selenium.webdriver.remote.remote_connection import RemoteConnection
 from selenium.common.exceptions import TimeoutException, StaleElementReferenceException, NoSuchWindowException, InvalidArgumentException
 from selenium.webdriver.support.events import EventFiringWebDriver, AbstractEventListener
 from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.support.ui import WebDriverWait
 from validator_collection import validators, checkers
 from tldextract import extract
 from validator_collection.checkers import is_url as validate_url
@@ -33,6 +35,7 @@ try:
     from Structures.Site import Site, parse_sites_arg
     from Structures.Async_generator import AGenerator, async_sleep
     from Structures.Search import search
+    from Structures.Interceptor import Interceptor
     from Analizers.Text_analizer import analize_text, find, words_related, _color_sent
     from Settings.jQuery import load, download, jq_file
 except ModuleNotFoundError:
@@ -40,6 +43,7 @@ except ModuleNotFoundError:
     from .Structures.Site import Site, parse_sites_arg
     from .Structures.Async_generator import AGenerator, async_sleep
     from .Structures.Search import search
+    from .Structures.Interceptor import Interceptor
     from .Analizers.Text_analizer import analize_text, find, words_related, _color_sent
     from .Settings.jQuery import load, download, jq_file
     
@@ -64,7 +68,16 @@ prefs.setIntPref("network.proxy.ftp_port", "${proxyUsed.port}");
 def main(proc_num=8):
     proc_num = int(proc_num)
 
-    a = Browser(sites=open("test.txt",'r',encoding="utf-8").readlines(), headless=False)
+    #a = Browser(sites=open("test.txt",'r',encoding="utf-8").readlines(), headless=False)
+    
+####
+    a = Browser(headless=False)
+
+    with a as browser:
+        input()
+
+    exit(0)
+####
 
     sh = AGenerator()
 
@@ -229,7 +242,7 @@ def test_jq(browser, size_pos=None):
     with browser as br:
         if(not size_pos is None): br.set_size_pos(*size_pos)
 
-        br.open_tab(link="https://www.instagram.com/instagram/")
+        br.open_tab(link="https://www.google.com")
         script = ("window.el = document.createElement('script');\nn = function(e){"
                     "e.type='text/javascript';"
                     f"e.innerHTML={next(jq_raw)};e.onload=function()"
@@ -252,12 +265,50 @@ class Browser():
     A browser site manager, with some data collection capabilities
 
     In case of using more than one browser it's highly recommended to open them all
-    before opening them
+    before running them
     """
+
+    # Shared attributes
+    _manager:Manager
+    _links:OrderedList
+    _timed_out_links:list
+
+    __lock_loaded:Lock
+    __lock_sited:Lock
+    __lock_timed:Lock
+    __lock_proxy:Lock
+
+    _visited_sites_counter:dict
+    _visited_domains_counter:dict
+
+    proxys:dict
+    interceptor:Interceptor=None
+
+    max_tabs:int=25
+    load_images:bool=True
+    autoload_videos:bool=False
+    load_timeout:float=20.0
+    load_wait:float=3.0
+
+    __jQuery_script:str
+
+    headless:bool=False
+    disable_downloads:bool=False
+
+    # Strictly unique per-browser
+
+    driver:webdriver.Firefox
+
+    _site_from_tab:dict
+    _async_site_sleep:AGenerator
+
     def __init__(self, sites:Iterable[Union[str, Site]]=[], load_timeout:float=20,
-                max_tabs:int=25, headless:bool=False, load_images:bool=True, autoload_videos:bool=False,
+                max_tabs:int=25, headless:bool=False, 
+                manager:Manager=None,
+                load_images:bool=True, autoload_videos:bool=False,
                 load_wait:float=3, disable_downloads:bool=False, 
                 proxy_dict:Dict[str,List[str]]={'socksProxy':[],'httpProxy':[],'ftpProxy':[],'sslProxy':[]}, 
+                global_interceptor:bool=False, interceptor_kwargs:dict={},
                 *, jq_filename:str=jq_file):
         
         ### Start loading
@@ -267,7 +318,7 @@ class Browser():
         ## Shared memory
 
         # Create a manager to create shared objects
-        self._manager = Manager()
+        self._manager = manager or Manager()
 
         # Check sites to be an OrderedList of {Site:depth}
         # Workaround. Improvement needed
@@ -294,6 +345,11 @@ class Browser():
         for key, proxy_list in proxy_dict.items(): 
             shuffle(proxy_list)
             self.proxys[key] = Browser.check_proxys(proxy_list)
+
+        # An interceptor proxy that will process all browsers' data
+        # If disabled it can still be set up per-browser in self.open
+        if(global_interceptor):
+            self.interceptor = Interceptor(self._manager, **interceptor_kwargs)
 
         ### PERFORMANCE settings
 
@@ -338,7 +394,11 @@ class Browser():
         self.close()
 
     def open(self, *, options=None, profile=None, capabilities=None, overwrite_config:bool=True,
-                        proxys:Dict[str,List[str]]=None):
+                        enable_drm:bool=True, block_cookies:str=True, enable_extensions:bool=True,
+                        extensions:list=[], 
+                        enable_interceptor:bool=False, interceptor_object:Interceptor=None, 
+                        interceptor_kwargs:dict={}, disable_javascript:bool=False,
+                        proxys:Dict[str,List[str]]=None, event_listener_obj:object=None):
         from selenium import webdriver
         from os import getcwd
         try:
@@ -348,11 +408,17 @@ class Browser():
             from .Settings.browser_configuration import get_configuration
             from .Structures.Async_generator import AGenerator
 
-        print(f"Starting the opening of a Browser{' (headless)' if self.headless else ''}")
-
-        #breakpoint()
+        print(f"\n[?] Starting the opening of a Browser{' (headless)' if self.headless else ''}")
 
         if(not proxys is None): self.proxys = proxys
+
+        if(enable_interceptor):
+            if(self.interceptor is None):
+                self.interceptor = interceptor_object or Interceptor(self._manager, **interceptor_kwargs)
+
+            # Overwrite socksProxy. Once mitmproxy has support for
+            # Socks5 & Upstream, redirect the mitmproxy
+            self.proxys["socksProxy"] = [self.interceptor.address]
 
         if(options is None or profile is None or capabilities is None or not overwrite_config):
             options2, profile2, capabilities2 = get_configuration(tabs_per_window=1000,
@@ -360,10 +426,13 @@ class Browser():
                                             load_images=self.load_images,
                                             autoload_videos=self.autoload_videos,
                                             disable_downloads=self.disable_downloads,
+                                            enable_drm=enable_drm, block_cookies=block_cookies,
+                                            enable_extensions=enable_extensions,
                                             proxys=self.get_proxy(http=True, ssl=True, ftp=True, socks=True),
                                             options=options if not overwrite_config else None, 
                                             profile=profile if not overwrite_config else None, 
-                                            capabilities=capabilities if not overwrite_config else None)
+                                            capabilities=capabilities if not overwrite_config else None,
+                                            disable_javascript=disable_javascript)
 
             if(not overwrite_config or options is None):
                 options = options2
@@ -376,7 +445,8 @@ class Browser():
 
         print("Configuration complete. Trying to run the drivers. This could take some time...")
         try:
-            self.driver = webdriver.Firefox(executable_path=f"{getcwd()}//geckodriver",
+            self.driver = webdriver.Firefox(
+                    executable_path=f"{'//'.join(__file__.split('/')[:-1])}//geckodriver",
                     options=options, firefox_profile=profile, capabilities=capabilities) 
 
             #self._profile = profile
@@ -386,6 +456,17 @@ class Browser():
         except Exception as ex:
             print(f"Looks like something failed. Error message: {ex}")
             self.driver = webdriver.Firefox()
+
+        if(not event_listener_obj is None):
+            self.driver = EventFiringWebDriver(self.driver, event_listener_obj)
+
+            if(True):
+                pass
+                #self.driver.install_addon('//'.join(__file__.split('/')[:-1])+"//Extensions//duckduckgo-privacy-extension//extension.xpi",
+                #                    temporary=False)
+                #self.driver.install_addon('//'.join(__file__.split('/')[:-1])+"//Extensions//scraper-extension//scraper-extension.xpi",
+                #                    temporary=False)
+                
 
         self.driver.get("about:config")
         self.driver.execute_script("document.querySelector('button').click();")
@@ -407,6 +488,9 @@ class Browser():
 
     def close(self):
         self.driver.quit()
+
+        if(not self.interceptor is None):
+            self.interceptor.close()
 
     def _get_sites(self, *, _number:int=1):
         # Ask for access
@@ -433,7 +517,7 @@ class Browser():
             for site in sites:
                 self._site_from_tab[site.tab] = site
 
-            if(len(self._site_from_tab) or not wait):
+            if(len(self._site_from_tab) or not wait):        
                 return self._site_from_tab.values()
 
     def open_tab(self, *, link:str=None, site:Site=None) -> int:
@@ -465,7 +549,7 @@ class Browser():
         
         self.__lock_timed.acquire()
 
-        try:
+        try:                
             self.driver.switch_to.window(tab)
             self.driver.get(link)
         except TimeoutException:
@@ -680,6 +764,9 @@ class Browser():
                     "{console.log('Checking jQuery');jQuery.noConflict();console.log('jQuery injected')};"
                     "console.log('Injecting');document.head.appendChild(e);console.log(e);}(el);")
 
+    def new_proxy(self) -> None:
+        self.set_proxy(*self.get_proxy(http=True, ssl=True, ftp=True, socks=True))
+
     def get_proxy(self, *, http:bool=False, ssl:bool=False, ftp:bool=False, socks:bool=False) -> dict:
         result = {}
         self.__lock_proxy.acquire()
@@ -770,12 +857,15 @@ class Browser():
         except KeyError: pass
 
     # Aesthetics function    
+    
     def set_size_pos(self, size:Tuple[int,int], position:Tuple[int,int]=(0,0)) -> None:
         self.driver.set_window_rect(*position,*size)
 
+    # Static methods
+
     @staticmethod
     def domain_from_link(link:str) -> Optional[str]:
-        return re_search(r"(?<=:\/\/)?(([A-Z]|[a-z]|[0-9])+\.)+([A-Z]|[a-z]|[0-9])+", link).group()
+        return re_search(r"(?<=:\/\/)?(([A-Z]|[a-z]|[0-9])+[.:])+([A-Z]|[a-z]|[0-9])+", link).group()
 
     @staticmethod
     def check_proxys(proxys:list) -> list:

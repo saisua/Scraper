@@ -29,40 +29,28 @@ except ImportError as err:
             " PATH (environment variable)")
     exit(-1)
 
-from os import getcwd, path, makedirs
 print("[+] Done (git import)\n")
+print("Importing os, sys...")
+from os import getcwd, path, makedirs, walk
+import sys
 
+file_path = '//'.join(__file__.split('/')[:-1]) or file_path
 
-if(not path.exists(f"{getcwd()}//Structures//Sockets")):
+if(not path.exists(f"{file_path}//Structures//Sockets")):
     print("Cloning from git...")
-    Repo.clone_from("https://github.com/saisua/Sockets",f"{getcwd()}//Structures//Sockets")
+    Repo.clone_from("https://github.com/saisua/Sockets",f"{file_path}//Structures//Sockets")
     print("[+] Done (git clone)\n")
 else:
     print("[?] Sockets has already been downloaded")
     print("Fetching to overwrite with the lastest version...")
-    local_repository = Repo(f"{getcwd()}//Structures//Sockets")
+    local_repository = Repo(f"{file_path}//Structures//Sockets")
     for remote in local_repository.remotes:
         remote.fetch()
     local_repository.git.reset("--hard")
     print("[+] Done (git fetch)\n")
 
-if(not path.exists(f"{getcwd()}//Extensions//duckduckgo-privacy-extension")):
-    print("Importing requests...")
-    from requests import get as GET
-    print("[+] Done (requests import)\n")
 
-    print("Downloading extension...")
-    response = GET("https://addons.mozilla.org/firefox/downloads/file/3560936/duckduckgo_privacy_essentials-2020.4.30-an+fx.xpi?src=dp-btn-primary")
-    if(not response.status_code == 200):
-        print("Error when downolading an extension")
-        exit(-1)
-
-    makedirs(f"{getcwd()}//Extensions//duckduckgo-privacy-extension//")
-    with open(f"{getcwd()}//Extensions//duckduckgo-privacy-extension//extension.xpi", "wb") as file:
-        file.write(response.content)
-    print("[+] Done (extension download)\n")
-
-if(not path.isfile(f"{getcwd()}//geckodriver")):
+if(not path.isfile(f"{file_path}//geckodriver")):
     print("Importing platform...")
     import platform
     print("[+] Done (platform import)\n")
@@ -77,7 +65,7 @@ if(not path.isfile(f"{getcwd()}//geckodriver")):
                 f"{'.tar.gz' if platform.system() == 'Linux' else '.zip'}")
     print(f"Downloading geckodriver ({system})...")
     wget.download(f"https://github.com/mozilla/geckodriver/releases/download/v0.26.0/geckodriver-v0.26.0-{system}",
-                        out=f"{getcwd()}//geckodriver-{system}")
+                        out=f"{file_path}//geckodriver-{system}")
 
 
     if(system.endswith("zip")):
@@ -86,7 +74,7 @@ if(not path.isfile(f"{getcwd()}//geckodriver")):
         print("[+] Done (zipfile import)\n")
 
         print(f"Extracting geckodriver-{system}... (not tested)")
-        zipfile.ZipFile(f"{getcwd()}//geckodriver-{system}").extractall()
+        zipfile.ZipFile(f"{file_path}//geckodriver-{system}").extractall()
         print(f"[+] Done (extraction)")
     else:
         print("Importing tarfile...")
@@ -94,5 +82,36 @@ if(not path.isfile(f"{getcwd()}//geckodriver")):
         print("[+] Done (tarfile import)\n")
 
         print(f"Extracting geckodriver-{system}...")
-        tarfile.open(f"{getcwd()}//geckodriver-{system}").extractall()
+        tarfile.open(f"{file_path}//geckodriver-{system}").extractall()
         print(f"[+] Done (extraction)")
+
+if(not path.exists(f"{file_path}//Extensions//duckduckgo-privacy-extension")):
+    print("Importing requests...")
+    from requests import get as GET
+    print("[+] Done (requests import)\n")
+
+    print("Downloading extension...")
+    response = GET("https://addons.mozilla.org/firefox/downloads/file/3560936/duckduckgo_privacy_essentials-2020.4.30-an+fx.xpi?src=dp-btn-primary")
+    if(not response.status_code == 200):
+        print("Error when downolading an extension")
+        exit(-1)
+
+    makedirs(f"{file_path}//Extensions//duckduckgo-privacy-extension//")
+    with open(f"{file_path}//Extensions//duckduckgo-privacy-extension//extension.xpi", "wb") as file:
+        file.write(response.content)
+    print("[+] Done (extension download)\n")
+
+if(path.isdir(f"{file_path}//Extensions//Scraper-src//")):
+    if(not zipfile in sys.modules):
+        print("Importing zipfile...")
+        import zipfile
+        print("[+] Done (zipfile import)\n")
+
+    print("Compiling Scraper firefox extension...")
+    with zipfile.ZipFile(f"{file_path}//Extensions//scraper-extension//scraper-extension.xpi", 'w') as file:
+        for root, dirs, files in walk(f"{file_path}//Extensions//Scraper-src//"):
+            for source in files:
+                file.write(f"{root}//{source}", 
+                    arcname=f"{root[root.find('Scraper-src//')+len('Scraper-src//')-1:]}/{source}"
+                )
+    print("[+] Done (Scraper firefox extension)")
