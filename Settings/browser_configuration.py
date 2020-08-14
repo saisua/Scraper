@@ -27,16 +27,19 @@ def get_configuration(*,tabs_per_window:int, headless:bool=False,
 
     if(profile is None):
         profile = webdriver.FirefoxProfile()
-    try:
-        del profile.DEFAULT_PREFERENCES['frozen']["browser.link.open_newwindow"]
-        del profile.DEFAULT_PREFERENCES['frozen']["security.fileuri.origin_policy"]
-        del profile.DEFAULT_PREFERENCES['frozen']["browser.safebrowsing.enabled"]
-        del profile.DEFAULT_PREFERENCES['frozen']["browser.safebrowsing.malware.enabled"]
-        
-        del profile.DEFAULT_PREFERENCES['frozen']["xpinstall.whitelist.required"]
 
-        #print(profile.DEFAULT_PREFERENCES)
-    except KeyError as err: print(f"Error on default preferences {err}")
+    if(profile.DEFAULT_PREFERENCES['frozen'].get("browser.link.open_newwindow")):
+        try:
+            del profile.DEFAULT_PREFERENCES['frozen']["browser.link.open_newwindow"]
+            del profile.DEFAULT_PREFERENCES['frozen']["security.fileuri.origin_policy"]
+            del profile.DEFAULT_PREFERENCES['frozen']["browser.safebrowsing.enabled"]
+            del profile.DEFAULT_PREFERENCES['frozen']["browser.safebrowsing.malware.enabled"]
+            
+            del profile.DEFAULT_PREFERENCES['frozen']["xpinstall.whitelist.required"]
+            del profile.DEFAULT_PREFERENCES['frozen']["javascript.enabled"]
+
+            #print(profile.DEFAULT_PREFERENCES)
+        except KeyError as err: print(f"Error on default preferences {err}")
     #http://kb.mozillazine.org/About:config_entries  #profile
     #http://kb.mozillazine.org/Categorhttps://stackoverflow.com/qhttps://stackoverflow.com/questions/20884089/dynamically-changing-proxy-in-firefox-with-selenium-webdriveruestions/20884089/dynamically-changing-proxy-in-firefox-with-selenium-webdrivery:Preferences
     profile.set_preference("browser.link.open_newwindow", 3)
@@ -72,6 +75,17 @@ def get_configuration(*,tabs_per_window:int, headless:bool=False,
     profile.set_preference("extensions.checkUpdateSecurity", False)
     profile.set_preference("extensions.update.autoUpdateEnabled", False)
     profile.set_preference("extensions.update.enabled", False)
+    profile.set_preference("extensions.systemAddon.update.enabled", False)
+    profile.set_preference("extensions.htmlaboutaddons.recommendations.enabled", False)
+    profile.set_preference("extensions.htmlaboutaddons.enabled", False)
+    profile.set_preference("extensions.htmlaboutaddons.discover.enabled", False)
+    profile.set_preference("extensions.formautofill.section.enabled", False)
+    profile.set_preference("extensions.formautofill.reauth.enabled", False)
+    profile.set_preference("extensions.formautofill.heuristics.enabled", False)
+    profile.set_preference("extensions.formautofill.firstTimeUse", False)
+    profile.set_preference("extensions.formautofill.creditCards.enabled", False)
+    profile.set_preference("extensions.formautofill.creditCards.available", False)
+    profile.set_preference("extensions.formautofill.addresses.enabled", False)
     profile.set_preference("general.startup.browser", False)
     profile.set_preference("plugin.default_plugin_disabled", False)
     profile.set_preference("browser.privatebrowsing.autostart", True)
@@ -181,7 +195,6 @@ def get_configuration(*,tabs_per_window:int, headless:bool=False,
     profile.set_preference("browser.safebrowsing.downloads.remote.block_dangerous", True)
     profile.set_preference("browser.safebrowsing.downloads.remote.block_dangerous_host", True)
     profile.set_preference("browser.safebrowsing.downloads.enabled", True)
-    profile.set_preference("browser.safebrowsing.malware.enabled", True)
     profile.set_preference("browser.safebrowsing.passwords.enabled", True)
     profile.set_preference("browser.safebrowsing.phishing.enabled", True)
     profile.set_preference("browser.urlbar.placeholderName", "Selenium")
@@ -197,12 +210,14 @@ def get_configuration(*,tabs_per_window:int, headless:bool=False,
     profile.set_preference("browser.urlbar.suggest.searches", False) 
     profile.set_preference("browser.newtabpage.activity-stream.improvesearch.topSiteSearchShortcuts.searchEngines","duckduckgo")
     profile.set_preference("accessibility.force_disabled", True)
-    
+    profile.set_preference("extensions.webextensions.keepStorageOnUninstall", False)
+    profile.set_preference("extensions.webextensions.keepUuidOnUninstall", False)
+
     if(isinstance(block_cookies, str) and "all" in block_cookies.lower()):
         profile.set_preference("network.cookie.cookieBehavior", 2)
         print("Cookies are disabled. This may cause some websites to not work")
     else:
-        print(int(block_cookies))
+        #print(int(block_cookies))
         profile.set_preference("network.cookie.cookieBehavior", int(block_cookies))
 
     if(disable_downloads):
@@ -259,10 +274,33 @@ def get_configuration(*,tabs_per_window:int, headless:bool=False,
 
     if(disable_javascript):
         capabilities["javascriptEnabled"] = False
+        profile.set_preference("javascript.enabled", False)
 
     #breakpoint()
     if(enable_extensions):
-        profile.add_extension(".//Extensions//duckduckgo-privacy-extension//extension.xpi")
+        import os
+
+        ext_path = '//'.join(__file__.split('/')[:-2])+"//Extensions//"
+
+        if(True):
+            print("[?] Compiling scraper extension. If this instance is not for debugging purposes,"+
+                    " this should not be happening.")
+
+            import zipfile
+
+            with zipfile.ZipFile(ext_path+"scraper-extension//scraper-extension.xpi", 'w') as file:
+                for root, dirs, files in os.walk(ext_path+"Scraper-src//"):
+                    for source in files:
+                        file.write(f"{root}//{source}", 
+                            arcname=f"{root[root.find('Scraper-src//')+len('Scraper-src//')-1:]}/{source}"
+                        )
+
+        
+        for root, dirs, files in os.walk(ext_path):
+            for name in files:
+                if(name.endswith(".xpi")):
+                    print(f"Added extension \"{name}\"")
+                    profile.add_extension(f"{root}//{name}")
 
         for extension in extensions:
             profile.add_extension(extension)
