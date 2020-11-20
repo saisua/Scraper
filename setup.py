@@ -34,7 +34,7 @@ print("Importing os, sys...")
 from os import getcwd, path, makedirs, walk
 import sys
 
-file_path = '//'.join(__file__.split('/')[:-1]) or file_path
+file_path = '//'.join(__file__.split('/')[:-1]) or getcwd()
 
 if(not path.exists(f"{file_path}//Structures//Sockets")):
     print("Cloning from git...")
@@ -102,7 +102,7 @@ if(not path.exists(f"{file_path}//Extensions//duckduckgo-privacy-extension")):
     print("[+] Done (extension download)\n")
 
 if(path.isdir(f"{file_path}//Extensions//Scraper-src//")):
-    if(not zipfile in sys.modules):
+    if(not "zipfile" in globals()):
         print("Importing zipfile...")
         import zipfile
         print("[+] Done (zipfile import)\n")

@@ -310,7 +310,7 @@ class Browser():
                 proxy_dict:Dict[str,List[str]]={'socksProxy':[],'httpProxy':[],'ftpProxy':[],'sslProxy':[]}, 
                 global_interceptor:bool=False, interceptor_kwargs:dict={},
                 *, jq_filename:str=jq_file):
-        
+
         ### Start loading
         jq = AGenerator()
         jq.append(load(jq_filename))
@@ -395,9 +395,10 @@ class Browser():
 
     def open(self, *, options=None, profile=None, capabilities=None, overwrite_config:bool=True,
                         enable_drm:bool=True, block_cookies:str=True, enable_extensions:bool=True,
-                        extensions:list=[], 
+                        extensions:list=[], enable_proxies:bool=False, 
                         enable_interceptor:bool=False, interceptor_object:Interceptor=None, 
                         interceptor_kwargs:dict={}, disable_javascript:bool=False,
+                        download_no_prompt:str=False,
                         proxys:Dict[str,List[str]]=None, event_listener_obj:object=None):
         from selenium import webdriver
         from os import getcwd
@@ -427,7 +428,8 @@ class Browser():
                                             autoload_videos=self.autoload_videos,
                                             disable_downloads=self.disable_downloads,
                                             enable_drm=enable_drm, block_cookies=block_cookies,
-                                            enable_extensions=enable_extensions,
+                                            enable_extensions=enable_extensions, enable_proxies=enable_proxies,
+                                            download_no_prompt=download_no_prompt,
                                             proxys=self.get_proxy(http=True, ssl=True, ftp=True, socks=True),
                                             options=options if not overwrite_config else None, 
                                             profile=profile if not overwrite_config else None, 
@@ -451,7 +453,7 @@ class Browser():
 
             #self._profile = profile
                     
-            print("Drivers ran succesfully!")
+            print("[+] Drivers ran succesfully!")
 
         except Exception as ex:
             print(f"Looks like something failed. Error message: {ex}")
@@ -467,8 +469,12 @@ class Browser():
                 #self.driver.install_addon('//'.join(__file__.split('/')[:-1])+"//Extensions//scraper-extension//scraper-extension.xpi",
                 #                    temporary=False)
                 
+        
+        ### Non-shared memory
+        self._site_from_tab = {}
 
-        self.driver.get("about:config")
+
+        self.open_link("about:config")
         self.driver.execute_script("document.querySelector('button').click();")
 
         #breakpoint()
@@ -477,14 +483,12 @@ class Browser():
         #self.driver.set_page_load_timeout(0)
         self.driver.set_page_load_timeout(self.load_timeout)
 
-        ### Non-shared memory
-        self._site_from_tab = {}
-
         ## Async site_sleep
         self._async_site_sleep = AGenerator()
         
 
-        print("New Browser opened")
+        print("[?] New Browser opened")
+        #print(self.driver.window_handles)
 
     def close(self):
         self.driver.quit()
@@ -540,13 +544,13 @@ class Browser():
 
         return tab
 
-    def open_link(self, link:str, *, new_tab:bool=False, site:Site=None, wait_load:bool=True):
+    def open_link(self, link:str, *, new_tab:bool=False, site:Site=None, wait_load:bool=True, async_load:bool=False):
         tab = self.driver.current_window_handle
         bef_tab = self.driver.window_handles.index(tab)
 
         if(new_tab):
             tab = self.open_tab(link=None)
-        
+
         self.__lock_timed.acquire()
 
         try:                
@@ -573,8 +577,11 @@ class Browser():
         self._site_from_tab[tab] = site
 
         if(wait_load):
-            self._async_site_sleep.append(self.async_sleep(tab, self.load_wait,
+            if(async_load):
+                self._async_site_sleep.append(self.async_sleep(tab, self.load_wait,
                                         _return=site))
+            else:
+                sleep(self.load_wait)
 
         return site
 
@@ -674,13 +681,17 @@ class Browser():
             return
         self.driver.switch_to_window(self.driver.window_handles[0])
 
+    def close_check(self, end_tab:str=None):
+        for zombie_tab in [tab for tab in self.driver.window_handles[1:] if not tab in self._site_from_tab]:
+            print(f"[-] Found a non-properly closed tab ({zombie_tab}). Closing it...")
+            self.close_tab(zombie_tab)
+        
+        self.driver.switch_to.window(end_tab or self.driver.window_handles[0])
+
     def restore_timed_out(self):
         self.__lock_timed.acquire()
 
-        for zombie_tab in [tab for tab in self.driver.window_handles[1:] if not tab in self._site_from_tab.keys()]:
-            print("Found a non-properly closed tab. Closing it...")
-            self.close_tab(zombie_tab)
-
+        self.close_check()
 
         self._links.extend(self._timed_out_links)
         
@@ -765,32 +776,31 @@ class Browser():
                     "console.log('Injecting');document.head.appendChild(e);console.log(e);}(el);")
 
     def new_proxy(self) -> None:
-        self.set_proxy(*self.get_proxy(http=True, ssl=True, ftp=True, socks=True))
+        self.set_proxy(**self.get_proxy(http=True, ssl=True, ftp=True, socks=True))
 
     def get_proxy(self, *, http:bool=False, ssl:bool=False, ftp:bool=False, socks:bool=False) -> dict:
         result = {}
         self.__lock_proxy.acquire()
 
         if(http and len(self.proxys.get('httpProxy', []))):
-            aux = self.proxys['httpProxy'][0]
-            result['httpProxy'] = aux
-            self.proxys['httpProxy'].pop(0)
-            self.proxys['httpProxy'].append(aux)
+            result['httpProxy'] = self.proxys['httpProxy'][0]
+
+            self.proxys['httpProxy'].append(self.proxys['httpProxy'].pop(0))
+
         if(ssl and len(self.proxys.get('sslProxy', []))):
-            aux = self.proxys['sslProxy'][0]
-            result['sslProxy'] = aux
-            self.proxys['sslProxy'].pop(0)
-            self.proxys['sslProxy'].append(aux)
+            result['sslProxy'] = self.proxys['sslProxy'][0]
+
+            self.proxys['sslProxy'].append(self.proxys['sslProxy'].pop(0))
+
         if(ftp and len(self.proxys.get('ftpProxy', []))):
-            aux = self.proxys['ftpProxy'][0]
-            result['ftpProxy'] = aux
-            self.proxys['ftpProxy'].pop(0)
-            self.proxys['ftpProxy'].append(aux)
+            result['ftpProxy'] = self.proxys['ftpProxy'][0]
+
+            self.proxys['ftpProxy'].append(self.proxys['ftpProxy'].pop(0))
+
         if(socks and len(self.proxys.get('socksProxy', []))):
-            aux = self.proxys['socksProxy'][0]
-            result['socksProxy'] = aux
-            self.proxys['socksProxy'].pop(0)
-            self.proxys['socksProxy'].append(aux)
+            result['socksProxy'] = self.proxys['socksProxy'][0]
+
+            self.proxys['socksProxy'].append(self.proxys['socksProxy'].pop(0))
 
         self.__lock_proxy.release()
 
@@ -836,9 +846,8 @@ class Browser():
             if(not tab in self.driver.window_handles):
                 #breakpoint()
                 self._site_from_tab.pop(tab)
-                for zombie_tab in [tab for tab in self.driver.window_handles[1:] if not tab in self._site_from_tab.keys()]:
-                    print("Found a non-properly closed tab. Closing it...")
-                    self.close_tab(zombie_tab)
+                self.close_check()
+
                 return
 
             self.__lock_timed.acquire()
