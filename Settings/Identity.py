@@ -1,4 +1,13 @@
 from random import randint, choice
+from typing import Pattern
+
+import re
+
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.common.by import By
+from time import sleep
+
 
 class Identity():
     oscpu:tuple
@@ -193,8 +202,96 @@ class Identity():
                 values.append(var)
 
             
-
         Identity._userAgent()
         values.append(Identity.userAgent)
 
         return values
+
+    @staticmethod
+    def _http(browser, *, country:str="all", anonimity:"str[all/elite/anonymous/transparent]"="all", 
+                        sleep_time:int=3):
+        print("Getting http proxies")
+
+        tab:int = browser.open_link(("https://api.proxyscrape.com/?request=share&proxytype=http&timeout=10000&"
+                            f"country={country}&ssl=yes&anonymity={anonimity}"), new_tab=True).tab
+
+        result = browser.driver.execute_script("return document.querySelector('textarea').defaultValue;").split()
+       
+        browser.close_tab(tab)
+        browser.driver.switch_to.window(browser.driver.window_handles[0])
+
+        return result
+
+    @staticmethod
+    def _socks5(browser, *, country:str="all", sleep_time:int=3):
+        print("Getting socks proxies")
+
+        tab:int = browser.open_link(("https://api.proxyscrape.com/?request=share&proxytype=socks5&timeout=10000"
+                            f"country={country}"), new_tab=True).tab
+
+        result = browser.driver.execute_script("return document.querySelector('textarea').defaultValue;").split()
+        browser.close_tab(tab)
+        browser.driver.switch_to.window(browser.driver.window_handles[0])
+
+        return result
+
+    _ssl_regex:Pattern = re.compile(
+        "^(\d+\.\d+\.\d+\.\d+)\s+(\d+)\s+(\w+)\s+(\w+\,?([^\t]\w+)+)\s+(\w+([^\t]\w+)?)\s+\w+\s+(\w+)"
+        , re.M)
+
+    @staticmethod
+    def _ssl(browser, *, country:str="all", anonimity:"str[all/elite/anonymous/transparent]"="all", 
+                        sleep_time:int=3):
+        print("Getting ssl proxies")
+
+        tab = browser.open_link("https://www.sslproxies.org/", new_tab=True).tab
+
+        if(country != "all"):
+            if(anonimity != "all"):
+                def check_ssl(group): return group[2] == country and group[5] == anonimity
+            else:
+                def check_ssl(group): return group[2] == country
+        elif(anonimity != "all"):
+            def check_ssl(group): return group[5] == anonimity
+        else:
+            result = browser.driver.execute_script(
+                    "return document.querySelector('textarea').innerText;")
+
+            result = result[re.search(r"\d+\.\d+\.\d+\.\d+", result).start():].split()
+
+            browser.close_tab(tab)
+            browser.driver.switch_to.window(browser.driver.window_handles[0])
+
+            return result
+
+        result = Identity._ssl_regex.finditer(
+                browser.driver.execute_script("return document.querySelector(\"table[id='proxylisttable'] tbody\").innerText;")
+            )
+
+        browser.close_tab(tab)
+        browser.driver.switch_to.window(browser.driver.window_handles[0])
+
+        return list(map(lambda tup: f"{tup[0]}:{tup[1]}", filter(check_ssl, result)))
+
+    @staticmethod
+    def _get_proxies(browser, http:bool=False, ssl:bool=False, socks:bool=False, *, 
+                                country:str="all", anonimity:"str[all/elite/anonymous/transparent]"="all",
+                                sleep_time:int=3):
+        result = {}
+
+        if(http): result["httpProxy"] = Identity._http(browser, country=country, anonimity=anonimity, 
+                                                        sleep_time=3)
+        if(ssl): result["sslProxy"] = Identity._ssl(browser, country=country, anonimity=anonimity, 
+                                                        sleep_time=3)
+        if(socks): result["socksProxy"] = Identity._socks5(browser, country=country,
+                                                        sleep_time=3)
+
+        print()
+        for key, val in result.items():
+            print(f"Got {len(val)} {key}s")
+        print()
+
+        return result
+
+if __name__ == "__main__":
+    Identity.identity()

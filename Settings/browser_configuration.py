@@ -6,13 +6,92 @@ from selenium.webdriver.common.proxy import Proxy, ProxyType
 
 from selenium import webdriver
 
+DOWNLOAD_MIME_TYPES = [
+    'application/epub+zip',
+    'application/gzip',
+    'application/java-archive',
+    'application/json',
+    'application/ld+json',
+    'application/msword',
+    'application/octet-stream',
+    'application/ogg',
+    'application/pdf',
+    'application/rtf',
+    'application/vnd.amazon.ebook',
+    'application/vnd.apple.installer+xml',
+    'application/vnd.mozilla.xul+xml',
+    'application/vnd.ms-excel',
+    'application/vnd.ms-fontobject',
+    'application/vnd.ms-powerpoint',
+    'application/vnd.oasis.opendocument.presentation',
+    'application/vnd.oasis.opendocument.spreadsheet',
+    'application/vnd.oasis.opendocument.text',
+    'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'application/vnd.rar',
+    'application/vnd.visio',
+    'application/x-7z-compressed',
+    'application/x-abiword',
+    'application/x-bzip',
+    'application/x-bzip2',
+    'application/x-csh',
+    'application/x-freearc',
+    'application/x-httpd-php',
+    'application/x-sh',
+    'application/x-shockwave-flash',
+    'application/x-tar',
+    'application/xhtml+xml',
+    'application/xml ',
+    'application/zip',
+    'audio/3gpp',
+    'audio/3gpp2',
+    'audio/aac',
+    'audio/midi',
+    'audio/mpeg',
+    'audio/ogg',
+    'audio/opus',
+    'audio/wav',
+    'audio/webm',
+    'audio/x-midi',
+    'font/otf',
+    'font/ttf',
+    'font/woff',
+    'font/woff2',
+    'image/bmp',
+    'image/gif',
+    'image/jpeg',
+    'image/png',
+    'image/svg+xml',
+    'image/tiff',
+    'image/vnd.microsoft.icon',
+    'image/webp',
+    'text/calendar',
+    'text/css',
+    'text/csv',
+    'text/html',
+    'text/javascript',
+    'text/plain',
+    'text/xml',
+    'video/3gpp',
+    'video/3gpp2',
+    'video/mp2t',
+    'video/mpeg',
+    'video/ogg',
+    'video/webm',
+    'video/x-msvideo'
+]
 
 def get_configuration(*,tabs_per_window:int, headless:bool=False,
                         load_images:bool=True, disable_downloads:bool=False,
                         disable_javascript:bool=False, autoload_videos:bool=False,
                         proxys={}, block_cookies:str=True, enable_drm:bool=True,
+                        enable_proxies:bool=False, download_no_prompt:str=False,
                         enable_extensions:bool=True, extensions:list=[],
                         options=None, profile=None, capabilities=None):
+
+    path = '//'.join(__file__.split('/')[:-2])
+
     if(capabilities is None):
         # https://github.com/SeleniumHQ/selenium/wiki/DesiredCapabilities
         capabilities = DesiredCapabilities.FIREFOX.copy()
@@ -191,6 +270,22 @@ def get_configuration(*,tabs_per_window:int, headless:bool=False,
     profile.set_preference("browser.contentblocking.category", "custom")
     profile.set_preference("privacy.clearOnShutdown.cookies", True)
     profile.set_preference("privacy.clearOnShutdown.downloads", True)
+    profile.set_preference("privacy.clearOnShutdown.cache", True)
+    profile.set_preference("privacy.clearOnShutdown.formdata", True)
+    profile.set_preference("privacy.clearOnShutdown.history", True)
+    profile.set_preference("privacy.clearOnShutdown.offlineApps", True)
+    profile.set_preference("privacy.clearOnShutdown.openWindows", True)
+    profile.set_preference("privacy.clearOnShutdown.sessions", True)
+    profile.set_preference("privacy.clearOnShutdown.siteSettings", True)
+    profile.set_preference("services.sync.prefs.sync.privacy.clearOnShutdown.cache", True)
+    profile.set_preference("services.sync.prefs.sync.privacy.clearOnShutdown.cookies", True)
+    profile.set_preference("services.sync.prefs.sync.privacy.clearOnShutdown.downloads", True)
+    profile.set_preference("services.sync.prefs.sync.privacy.clearOnShutdown.formdata", True)
+    profile.set_preference("services.sync.prefs.sync.privacy.clearOnShutdown.history", True)
+    profile.set_preference("services.sync.prefs.sync.privacy.clearOnShutdown.offlineApps", True)
+    profile.set_preference("services.sync.prefs.sync.privacy.clearOnShutdown.sessions", True)
+    profile.set_preference("services.sync.prefs.sync.privacy.clearOnShutdown.siteSettings", True)
+    profile.set_preference("services.sync.prefs.sync.privacy.sanitize.sanitizeOnShutdown", True)
     profile.set_preference("privacy.donottrackheader.enabled", True)
     profile.set_preference("browser.safebrowsing.downloads.remote.block_dangerous", True)
     profile.set_preference("browser.safebrowsing.downloads.remote.block_dangerous_host", True)
@@ -225,8 +320,6 @@ def get_configuration(*,tabs_per_window:int, headless:bool=False,
         profile.set_preference("browser.download.panel.shown", False)
         profile.set_preference("browser.download.useDownloadDir", False)
         profile.set_preference("services.sync.prefs.sync.browser.download.useDownloadDir", False)
-        profile.set_preference("browser.helperApps.neverAsk.saveToDisk", "application/*")
-        profile.set_preference("browser.helperApps.neverAsk.openFile", "application/*")
         profile.set_preference("pdfjs.disabled", True)
     #profile.set_preference("browser.translation.neverForLanguages", "*")
 
@@ -246,6 +339,17 @@ def get_configuration(*,tabs_per_window:int, headless:bool=False,
 
     if(enable_drm):
         profile.set_preference("media.eme.enabled", True)
+
+    if(download_no_prompt):
+        if(download_no_prompt == "all"):
+            download_no_prompt = ';'.join(DOWNLOAD_MIME_TYPES)+';'
+
+        profile.set_preference("browser.download.useDownloadDir", True)
+        profile.set_preference("browser.download.dir", path+"//downloads//")
+        profile.set_preference("browser.download.folderList", 2)
+        profile.set_preference("browser.helperApps.neverAsk.saveToDisk", download_no_prompt)
+        profile.set_preference("browser.download.manager.showWhenStarting", False)
+        profile.set_preference("pdfjs.disabled", True)
 
 
     #Test
@@ -280,7 +384,7 @@ def get_configuration(*,tabs_per_window:int, headless:bool=False,
     if(enable_extensions):
         import os
 
-        ext_path = '//'.join(__file__.split('/')[:-2])+"//Extensions//"
+        ext_path = path+"//Extensions//"
 
         if(True):
             print("[?] Compiling scraper extension. If this instance is not for debugging purposes,"+
@@ -295,42 +399,40 @@ def get_configuration(*,tabs_per_window:int, headless:bool=False,
                             arcname=f"{root[root.find('Scraper-src//')+len('Scraper-src//')-1:]}/{source}"
                         )
 
-        
         for root, dirs, files in os.walk(ext_path):
             for name in files:
                 if(name.endswith(".xpi")):
                     print(f"Added extension \"{name}\"")
                     profile.add_extension(f"{root}//{name}")
 
+
         for extension in extensions:
             profile.add_extension(extension)
 
 
-    http_proxy = proxys.get("httpProxy", None)
-    ssl_proxy = proxys.get("sslProxy", None)
-    ftp_proxy = proxys.get("ftpProxy", None)
-    socks_proxy = proxys.get("socksProxy", None)
+    http_proxy = proxys.get("httpProxy", '')
+    ssl_proxy = proxys.get("sslProxy", '')
+    ftp_proxy = proxys.get("ftpProxy", '')
+    socks_proxy = proxys.get("socksProxy", '')
 
+    if(enable_proxies or len(http_proxy) or len(ssl_proxy) or len(ftp_proxy) or len(socks_proxy)):
+        profile.set_preference("network.proxy.type", 1)
 
-    if(not http_proxy is None and len(http_proxy)): 
-        profile.set_preference("network.proxy.type", 1)
-        http_proxy = http_proxy.split(':')
-        profile.set_preference("network.proxy.http", http_proxy[0])
-        profile.set_preference("network.proxy.http_port", int(http_proxy[1])) 
-    if(not ssl_proxy is None and len(ssl_proxy)): 
-        profile.set_preference("network.proxy.type", 1)
-        ssl_proxy = ssl_proxy.split(':')
-        profile.set_preference("network.proxy.ssl", ssl_proxy[0])
-        profile.set_preference("network.proxy.ssl_port", int(ssl_proxy[1])) 
-    if(not ftp_proxy is None and len(ftp_proxy)): 
-        profile.set_preference("network.proxy.type", 1)
-        ftp_proxy = ftp_proxy.split(':')
-        profile.set_preference("network.proxy.ftp", ftp_proxy[0])
-        profile.set_preference("network.proxy.ftp_port", int(ftp_proxy[1])) 
-    if(not socks_proxy is None and len(socks_proxy)):
-        profile.set_preference("network.proxy.type", 1)
-        socks_proxy = socks_proxy.split(':')
-        profile.set_preference("network.proxy.socks", socks_proxy[0])
-        profile.set_preference("network.proxy.socks_port", int(socks_proxy[1])) 
+    if(len(http_proxy)): 
+        http_proxy, http_port = http_proxy.split(':')
+        profile.set_preference("network.proxy.http", http_proxy)
+        profile.set_preference("network.proxy.http_port", int(http_port)) 
+    if(len(ssl_proxy)): 
+        ssl_proxy, ssl_port = ssl_proxy.split(':')
+        profile.set_preference("network.proxy.ssl", ssl_proxy)
+        profile.set_preference("network.proxy.ssl_port", int(ssl_port)) 
+    if(len(ftp_proxy)): 
+        ftp_proxy, ftp_port = ftp_proxy.split(':')
+        profile.set_preference("network.proxy.ftp", ftp_proxy)
+        profile.set_preference("network.proxy.ftp_port", int(ftp_port)) 
+    if(len(socks_proxy)):
+        socks_proxy, socks_port = socks_proxy.split(':')
+        profile.set_preference("network.proxy.socks", socks_proxy)
+        profile.set_preference("network.proxy.socks_port", int(socks_port)) 
 
     return options, profile, capabilities
