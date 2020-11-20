@@ -4,7 +4,9 @@ var COMMUNICATION_CODES = {
     "text sel":73452,
     "image":93726,
     "security":98500,
-    "lookup":11173 
+    "lookup":11173,
+    "search":33967,
+    "set afrun":3621
 }
 
 var SLEEP_TIME = 250;
@@ -16,8 +18,8 @@ function aux_get_ip(tab_id){
     browser.tabs.executeScript(
         tab_id,
         {
-        code : "document.querySelector('scraperip').innerText;",
-        matchAboutBlank : false
+            code : "document.querySelector('scraperip').innerText;",
+            matchAboutBlank : false
         }
     ).then(function (ip) {
         if(ip == ''){
@@ -62,6 +64,24 @@ async function onclick_crawl(data, tab){
     send( 
         COMMUNICATION_CODES["crawl"],
         data.linkUrl || data.pageUrl
+    );
+}
+
+async function onclick_lookup(data, tab){
+    //alert("Crawl ["+COMMUNICATION_CODES["crawl"]+"]");
+    //alert(data.linkUrl || data.pageUrl);
+    
+    if(!IP){
+        aux_get_ip(tab.id)
+
+        while(IP === null) await sleep(SLEEP_TIME);
+        
+        if(!IP) return;
+    }
+
+    send( 
+        COMMUNICATION_CODES["lookup"],
+        data.linkUrl || ''
     );
 }
 
@@ -138,8 +158,8 @@ async function onclick_security_check(data, tab){
     );
 }
 
-async function onclick_lookup(data, tab){
-    //alert("Lookup ["+COMMUNICATION_CODES["lookup"]+"]");
+async function onclick_search(data, tab){
+    //alert("Lookup ["+COMMUNICATION_CODES["search"]+"]");
     //alert(data.selectionText);
 
     if(!IP){
@@ -151,11 +171,38 @@ async function onclick_lookup(data, tab){
     }
 
     send( 
-        COMMUNICATION_CODES["lookup"],
+        COMMUNICATION_CODES["set afrun"],
         data.selectionText
     );
 }
     
+async function onclick_run_after(data, tab){
+    //alert("Lookup ["+COMMUNICATION_CODES["search"]+"]");
+    //alert(data.selectionText);
+
+    if(!IP){
+        aux_get_ip(tab.id)
+
+        while(IP === null) await sleep(SLEEP_TIME);
+        
+        if(!IP) return;
+    }
+
+    browser.tabs.executeScript(
+        tab_id,
+        {
+        code : "window.scraper_run_after_msg;",
+        matchAboutBlank : true
+        }
+    ).then(
+            code_ => (
+            send( 
+                COMMUNICATION_CODES["search"],
+                code_
+            )
+        )
+    )
+}
 
 // ["all","audio","bookmark","browser_action","editable","frame","image","link","page","page_action","password","selection","tab","tools_menu","video"]
 
@@ -166,6 +213,14 @@ browser.menus.create({
     contexts: ["all"],
     onclick: onclick_crawl
 });
+
+browser.menus.create({
+    id: "test10",
+    title: "Lookup",
+    contexts: ["all"],
+    onclick: onclick_lookup
+});
+
 
 ////
 
@@ -217,11 +272,23 @@ browser.menus.create({
 // General, Images, Videos, News, Shopping, Maps, Social, All
 browser.menus.create({
     id: "test6",
-    title: "Lookup menu",
+    title: "Search",
     contexts: ["selection"],
-    onclick: onclick_lookup
+    onclick: onclick_search
 });
 
+browser.menus.create({
+    id: "separator3",
+    type: "separator",
+    contexts: ["all"]
+});
+
+browser.menus.create({
+    id: "test7",
+    title: "_set run after_",
+    contexts: ["all"],
+    onclick: onclick_run_after
+});
 
 
 
