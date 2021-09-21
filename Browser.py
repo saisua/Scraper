@@ -14,6 +14,7 @@ from asyncio import run, create_task, get_event_loop, sleep as asleep
 from multiprocessing import Process, Manager, Lock
 from multiprocessing.managers import BaseProxy
 from selenium import webdriver
+import selenium.webdriver.firefox
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.common.by import By
@@ -60,6 +61,7 @@ prefs.setIntPref("network.proxy.ssl_port", "${proxyUsed.port}");
 prefs.setCharPref("network.proxy.ftp", "${proxyUsed.host}");
 prefs.setIntPref("network.proxy.ftp_port", "${proxyUsed.port}");
 """
+
 
 def main(proc_num=8):
     proc_num = int(proc_num)
