@@ -69,6 +69,7 @@ def main(proc_num = int(argv[1]) if len(argv) > 1 else 1):
 
             for _,s_dict,sentences in list(filter(None, found)): # filters are tmp fix
                 result.extend([sentences[n] for n in find(rel_words,s_dict)])
+            break
 
         print(f"\n\nFound {len(result)} phrases containing words related to {to_search}\n")
 
