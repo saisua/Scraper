@@ -1,2 +1,0 @@
-psutil # System detection
-rpyc   # RPC client/server
