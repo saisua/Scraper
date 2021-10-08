@@ -15,9 +15,14 @@ print("[+] Done (Extension import)\n")
 print("Compiling the program into Cython...\n\n###")
 setup(
     name='Scraper',
-    ext_modules=cythonize("Browser.pyx", 
+    ext_modules=cythonize(["Core//Browser.pyx", "Settings//browser_configuration.pyx",
+                            "Utils//utils.pyx"
+                            # Testing
+                            #"Core//Distributed_Browser.pyx"
+                            ],
                             language="c++", language_level=3),
     zip_safe=False,
-    extra_compile_args=["-O3"]
+    extra_compile_args=["-O3", "-ffast-math", 
+                        "-march=native"]
 )
 print("###\n\n[+] Done (Compilation)\n")

@@ -2,23 +2,6 @@ print("#################")
 print("STARTING SETUP.PY")
 print("#################\n\n\n")
 
-print("Importing os, sys...")
-from os import getcwd, path, makedirs, walk
-import sys
-
-file_path = '//'.join(__file__.split('/')[:-1]) or getcwd()
-
-"""
-print("Importing nltk...")
-import nltk
-print("[+] Done (nltk import)\n")
-
-print("Downloading nltk packages...")
-nltk.download('averaged_perceptron_tagger')
-nltk.download('wordnet')
-nltk.download('punkt')
-print("[+] Done (nltk packages)\n")
-
 print("Importing git...")
 try:
     from git import Repo
@@ -31,6 +14,11 @@ except ImportError as err:
     exit(-1)
 
 print("[+] Done (git import)\n")
+print("Importing os, sys...")
+from os import getcwd, path, makedirs, walk
+import sys
+
+file_path = '//'.join(__file__.split('/')[:-1]) or getcwd()
 
 if(not path.exists(f"{file_path}//Structures//Sockets")):
     print("Cloning from git...")
@@ -44,7 +32,7 @@ else:
         remote.fetch()
     local_repository.git.reset("--hard")
     print("[+] Done (git fetch)\n")
-"""
+
 
 if(not path.isfile(f"{file_path}//geckodriver")):
     print("Importing platform...")
@@ -81,7 +69,6 @@ if(not path.isfile(f"{file_path}//geckodriver")):
         tarfile.open(f"{file_path}//geckodriver-{system}").extractall()
         print(f"[+] Done (extraction)")
 
-"""
 if(not path.exists(f"{file_path}//Extensions//duckduckgo-privacy-extension")):
     print("Importing requests...")
     from requests import get as GET
@@ -112,35 +99,3 @@ if(path.isdir(f"{file_path}//Extensions//Scraper-src//")):
                     arcname=f"{root[root.find('Scraper-src//')+len('Scraper-src//')-1:]}/{source}"
                 )
     print("[+] Done (Scraper firefox extension)")
-"""
-
-print("Testing 'requirements.txt' packages...")
-print("\tTesting cython...", end=' ')
-import Cython
-print("Done")
-print("\tTesting selenium...", end=' ')
-import selenium
-print("Done")
-print("[+] Done (package testing)\n")
-
-sys.argv.extend(["build_ext","--inplace"])
-
-print("Importing setuptools...")
-from setuptools import setup
-print("[+] Done (setuptools import)\n")
-print("Importing Cython...")
-from Cython.Build import cythonize
-print("[+] Done (Cython import)\n")
-print("Importing Extension...")
-from distutils.extension import Extension
-print("[+] Done (Extension import)\n")
-
-print("Compiling the program into Cython...\n\n###")
-setup(
-    name='Scraper',
-    ext_modules=cythonize("Browser.pyx", 
-                            language="c++", language_level=3),
-    zip_safe=False,
-    extra_compile_args=["-O3", "-ffast-math", "-march=native"]
-)
-print("###\n\n[+] Done (Compilation)\n")
