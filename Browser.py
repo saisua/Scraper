@@ -261,8 +261,8 @@ class Browser():
                 *, jq_filename:str=jq_file):
         
         ### Start loading
-        jq = AGenerator()
-        jq.append(load(jq_filename))
+        #jq = AGenerator()
+        #jq.append(load(jq_filename))
 
         ## Shared memory
 
@@ -318,7 +318,7 @@ class Browser():
 
         # Store the jQuery script as plain text. There should've take shorter,
         # since it has been loading async
-        self.__jQuery_script = next(jq)
+        #self.__jQuery_script = next(jq)
 
                 
         ###  OTHER configurations

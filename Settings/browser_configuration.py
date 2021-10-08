@@ -262,7 +262,7 @@ def get_configuration(*,tabs_per_window:int, headless:bool=False,
 
     #breakpoint()
     if(enable_extensions):
-        profile.add_extension(".//Extensions//duckduckgo-privacy-extension//extension.xpi")
+        #profile.add_extension(".//Extensions//duckduckgo-privacy-extension//extension.xpi")
 
         for extension in extensions:
             profile.add_extension(extension)
