@@ -1,0 +1,49 @@
+{
+  "browser_specific_settings": {
+    "gecko": {
+  		"id": "randomid@scraper",
+      "strict_min_version": "57.0"  
+    }
+  },
+
+  "manifest_version": 2,
+  "name": "Scraper",
+  "version": "0.0",
+  "incognito": "spanning",
+
+  "description": "Connects firefox extension layer with the main controller",
+
+  "icons": {
+    "48": "icons/tmp.png"
+  },
+
+  "permissions": [
+    "<all_urls>",
+    "tabs",
+    "menus",
+    "theme"
+  ],
+
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["scripts/overmenu.js"],
+      "css": ["css/overmenu.css"],
+      "match_about_blank": true,
+      "all_frames": false,
+      "run_at": "document_end"
+    }
+  ],
+
+  "background" : {
+    "scripts":[
+      "scripts/scraper.js"
+    ]
+  },
+
+  "browser_action": {
+    "default_icon": "icons/tmp.png",
+    "default_title": "ScrpaerA",
+    "default_popup": "html/popup.html"
+  }
+}
