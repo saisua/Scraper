@@ -2,25 +2,26 @@ print("#################")
 print("STARTING SETUP.PY")
 print("#################\n\n\n")
 
-print("Importing nltk...")
-import nltk
-print("[+] Done (nltk import)\n")
+#print("Importing nltk...")
+#import nltk
+#print("[+] Done (nltk import)\n")
 
-print("Downloading nltk packages...")
-nltk.download('averaged_perceptron_tagger')
-nltk.download('wordnet')
-nltk.download('punkt')
-print("[+] Done (nltk packages)\n")
+#print("Downloading nltk packages...")
+#nltk.download('averaged_perceptron_tagger')
+#nltk.download('wordnet')
+#nltk.download('punkt')
+#print("[+] Done (nltk packages)\n")
 
-from Settings.jQuery import download as jq_download
+#from Settings.jQuery import download as jq_download
 
-print("Downloading jQuery...")
-jq_download()
-print("[+] Done (jQuery download)\n")
+#print("Downloading jQuery...")
+#jq_download()
+#print("[+] Done (jQuery download)\n")
 
 print("Importing git...")
 try:
-    from git import Repo
+    #from git import Repo
+    pass
 except ImportError as err:
     print("\n\n\n")
     print(err)
@@ -33,18 +34,18 @@ from os import getcwd, path, makedirs
 print("[+] Done (git import)\n")
 
 
-if(not path.exists(f"{getcwd()}//Structures//Sockets")):
-    print("Cloning from git...")
-    Repo.clone_from("https://github.com/saisua/Sockets",f"{getcwd()}//Structures//Sockets")
-    print("[+] Done (git clone)\n")
-else:
-    print("[?] Sockets has already been downloaded")
-    print("Fetching to overwrite with the lastest version...")
-    local_repository = Repo(f"{getcwd()}//Structures//Sockets")
-    for remote in local_repository.remotes:
-        remote.fetch()
-    local_repository.git.reset("--hard")
-    print("[+] Done (git fetch)\n")
+#if(not path.exists(f"{getcwd()}//Structures//Sockets")):
+#    print("Cloning from git...")
+#    Repo.clone_from("https://github.com/saisua/Sockets",f"{getcwd()}//Structures//Sockets")
+#    print("[+] Done (git clone)\n")
+#else:
+#    print("[?] Sockets has already been downloaded")
+#    print("Fetching to overwrite with the lastest version...")
+#    local_repository = Repo(f"{getcwd()}//Structures//Sockets")
+#    for remote in local_repository.remotes:
+#        remote.fetch()
+#    local_repository.git.reset("--hard")
+#    print("[+] Done (git fetch)\n")
 
 if(not path.exists(f"{getcwd()}//Extensions//duckduckgo-privacy-extension")):
     print("Importing requests...")

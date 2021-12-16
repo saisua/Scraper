@@ -1,0 +1,1 @@
+cythonize -3 -i Core/*.pyx Settings/*.pyx
